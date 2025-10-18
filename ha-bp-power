@@ -1,0 +1,67 @@
+blueprint:
+  name: Dynamic Power Price Optimization
+  description: Control loads based on spot vs. fixed price with inverter feedback and SG Ready export
+  domain: automation
+  input:
+    spot_price_sensor:
+      name: Spot Price Sensor
+      selector:
+        entity:
+          domain: sensor
+    norgespris_input:
+      name: Fixed Price (Norgespris)
+      selector:
+        entity:
+          domain: input_number
+    inverter_production_sensor:
+      name: Inverter Production Sensor
+      selector:
+        entity:
+          domain: sensor
+    sg_ready_switch:
+      name: SG Ready Indicator Switch
+      selector:
+        entity:
+          domain: switch
+    water_heater_switch:
+      name: Water Heater Switch
+      selector:
+        entity:
+          domain: switch
+    car_charger_switch:
+      name: Car Charger Switch
+      selector:
+        entity:
+          domain: switch
+
+trigger:
+  - platform: time_pattern
+    minutes: "0"  # Every hour
+
+variables:
+  spot_price: "{{ states(input.spot_price_sensor) | float }}"
+  fixed_price: "{{ states(input.norgespris_input) | float }}"
+  inverter_production: "{{ states(input.inverter_production_sensor) | float }}"
+
+action:
+  - choose:
+      - conditions: "{{ spot_price > fixed_price }}"
+        sequence:
+          - service: switch.turn_off
+            target:
+              entity_id:
+                - !input water_heater_switch
+                - !input car_charger_switch
+          - service: switch.turn_off
+            target:
+              entity_id: !input sg_ready_switch
+      - conditions: "{{ spot_price <= fixed_price }}"
+        sequence:
+          - service: switch.turn_on
+            target:
+              entity_id:
+                - !input water_heater_switch
+                - !input car_charger_switch
+          - service: switch.turn_on
+            target:
+              entity_id: !input sg_ready_switch
